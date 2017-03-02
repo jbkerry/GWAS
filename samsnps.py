@@ -60,7 +60,8 @@ for BAMfile in BAMfiles:
             df.loc[RowCounter] = InsertList
             RowCounter+=1
 
-
+## at this point the script has read to each read and matched it to a SNP location where possible. For a given SNP it has calculated how many times the nucleotide matches that in the vanDeHarst paper or one of the other 3 nucleotides.
+## the dataframe also contains the 'replicate' i.e. the different day of the experiment (not really a replicate so this should be fixed later when taking averages) and the initials of the person
 
 GroupList = ['Person','SNP']
 grouped_df = df.groupby(GroupList)
@@ -87,7 +88,8 @@ for key, item in grouped_df:
     df_2.loc[Counter] = InsertList
     Counter+=1
 
-    
+## at this point the df groups the replicates of the SNPs together (in a person-dependent manner), takes the mean and SD of the GWAS-matching hits for a given SNP, across the 4 replicates, and compares this to mean of the non-GWAS matching hit across the 4 replicates.
+## The data points are compared against each other using the Mann-Whitney U test and the direction (i.e. GWAS SNP or not) is noted by checking which mean is higher and putting a '1' in the GWAS column of the df if it is the GWAS nucleotide, or '0' if it isn't
     
 grouped_df2 = df_2.groupby('Person')
 ###fig, axs = plt.subplots(nrows=2,ncols=1)
@@ -110,12 +112,14 @@ grouped_df2 = df_2.groupby('Person')
 ###    Counter+=1
 ###plt.tight_layout() 
 ###plt.subplots_adjust(bottom=0.15)   
-#plt.show()
+###plt.show()
+
+## below, the dataframe is pivoted to consists of two major columns: the log p-value and whether the nucleotide is GWAS or not. These two columns are subdivided by person, with the SNP name being the key for each row so that each SNP only has one record.
+## where a particular SNP location is not present in a person's sequence file, the NaN for log p-value is filled in with a false '0'
 
 bySNP = pd.pivot_table(df_2, index='SNP', columns='Person', values=['LogP','GWAS'])
 bySNP = bySNP.fillna(0)
-#print(bySNP[:10])
-
+print(bySNP[:20])
 fig, ax = plt.subplots()
 xtickRange = range(1,len(bySNP.index.values)+1)
 ax.set_xticks(xtickRange,minor=False)
@@ -143,7 +147,7 @@ plt.gca().add_artist(first_legend)
 plt.legend(bbox_to_anchor=(0.8,1))
 plt.subplots_adjust(bottom=0.15)
 #plt.savefig('scatter.png')
-plt.show()
+#plt.show()
 
 #print(bySNP['LogP'].columns.values)
 #print(bySNP.index.values)
