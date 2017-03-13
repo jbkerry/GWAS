@@ -5,16 +5,17 @@ from scipy import stats
 import re,subprocess,pandas as pd, numpy as np, matplotlib.pyplot as plt, math, matplotlib.patches as mpatches, sys, getopt
 
 def usage():
-    print("usage: PlotSNPs.py -i <initials of person> -r <read length (bp)>")
+    print("usage: PlotSNPs.py -i <initials of person> -r <read length (bp)> -c <read count cut-off>")
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'i:r:h',)
+    opts, args = getopt.getopt(sys.argv[1:], 'i:r:c:h',)
 except getopt.GetoptError:
     usage()
     sys.exit(2)
 
 InputInitial = ""
 ReadLength = 0
+ReadCutoff = 0
     
 if not opts:
     usage()
@@ -28,6 +29,8 @@ else:
             InputInitial = arg
         elif opt=='-r':
             ReadLength = int(arg)
+        elif opt=='-c':
+            ReadCutoff = int(arg)
         else:
             usage()
             sys.exit(2)
@@ -106,7 +109,7 @@ GTots = []
 
 for i in df_2.index.values:
     
-    BinaryList = np.where(df_2.iloc[i][ColumnList]>0,1,0)
+    BinaryList = np.where(df_2.iloc[i][ColumnList]>ReadCutoff,1,0) ##if read cut-off a nucleotide must appear in at least 2 sequences to be counted thereby reducing the chance of a sequencing error being included
     Total = sum(BinaryList)
     Percentage = [x/Total*100 for x in BinaryList]
     ATots.append(Percentage[0])
