@@ -41,11 +41,12 @@ RowCounter=0
 
 BAMfile = "/t1-data1/WTSA_Dev/jkerry/BloodATAC/"+InputInitial+"_input_sort.bam"
 SNPdict = {}
+InfoDict = {}
 Lines = [x.rstrip('\n') for x in open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/vanDeHarst2012_SNPs_hg19.txt')]
-
 for i in Lines:
     Chr, SNP, Loc, Base, Genes = i.split('\t')
     SNPdict[SNP] = {}
+    InfoDict[SNP] = {}
     EA, OA = Base.split('/')
     chrNum=int(Chr[3:])
     Loc = int(Loc)
@@ -106,7 +107,7 @@ ATots = []
 CTots = []
 TTots = []
 GTots = []
-
+UserDict = {}
 for i in df_2.index.values:
     
     BinaryList = np.where(df_2.iloc[i][ColumnList]>ReadCutoff,1,0) ##if read cut-off a nucleotide must appear in at least 2 sequences to be counted thereby reducing the chance of a sequencing error being included
@@ -117,12 +118,38 @@ for i in df_2.index.values:
     TTots.append(Percentage[2])
     GTots.append(Percentage[3])
     #print(Percentage)
+    #print(BinaryList)
+    Status = "neg"
+    if df_2.iloc[i][df_2.iloc[i]['GWAS']]>ReadCutoff: ##if read cut-off a nucleotide must appear in at least 2 sequences to be counted thereby reducing the chance of a sequencing error being included
+        Status = "pos"
+    Geno = "Hom"
+    if Total>1:
+        Geno = "Het"
+    elif Total==0:
+        Geno = "Ambiguous"
+    String = Geno+", "+Status
+    if Geno=="Ambiguous":
+        String = Geno
+    UserDict[df_2.iloc[i]['SNP']] = String
+
+output = open(InputInitial+"_vDH-SNPinfo.txt","w")
+output.write("SNP name\t"+InputInitial+"\n")
+for ThisSNP in sorted(InfoDict.keys()):
+    output.write(ThisSNP+"\t")
+    if ThisSNP not in UserDict.keys():
+        output.write("not detected\n")
+    else:
+        output.write(UserDict[ThisSNP]+"\n")
+output.close()
+
+#print(df_2[:20])
 
 N = len(ATots)
 ind = np.arange(N)
 width = 0.7
 #F1911E
 AColours = np.where([x=='A' for x in SNPList],'#B1D9F4','white')
+#AColours = np.where([x=='A' for x in SNPList],0.9,0.6)
 CColours = np.where([x=='C' for x in SNPList],'#B1D9F4','white')
 TColours = np.where([x=='T' for x in SNPList],'#B1D9F4','white')
 GColours = np.where([x=='G' for x in SNPList],'#B1D9F4','white')
@@ -131,6 +158,11 @@ pA = plt.bar(ind,ATots,width,color=AColours,hatch='/')
 pC = plt.bar(ind,CTots,width,bottom=ATots,color=CColours,hatch='.')
 pT = plt.bar(ind,TTots,width,bottom=[x+y for x,y in zip(ATots,CTots)],color=TColours,hatch='\\')
 pG = plt.bar(ind,GTots,width,bottom=[x+y+z for x,y,z in zip(ATots,CTots,TTots)],color=GColours,hatch='X')
+
+#pA = plt.bar(ind,ATots,width,color='blue',alpha=AColours)
+#pC = plt.bar(ind,CTots,width,bottom=ATots,color='red',alpha=0.5)
+#pT = plt.bar(ind,TTots,width,bottom=[x+y for x,y in zip(ATots,CTots)],color='green',alpha=0.5)
+#pG = plt.bar(ind,GTots,width,bottom=[x+y+z for x,y,z in zip(ATots,CTots,TTots)],color='yellow',alpha=0.5)
 
 plt.ylabel('Percentage of locus (%)',fontsize=18)
 plt.xlabel('Van de Harst SNPs',fontsize=18)
