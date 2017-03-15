@@ -34,6 +34,17 @@ else:
         else:
             usage()
             sys.exit(2)
+
+ImpDict = {}
+imputeLines = [x.rstrip('\n') for x in open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/Ron_imputed_SNPs.txt')]
+for imputation in imputeLines:
+    Chr, Start, Stop, ImpSNP, Ref_Al, Alt_Al, PrSNP, Desc, Type = imputation.split('\t')
+    if PrSNP not in ImpDict.keys():
+        ImpDict[PrSNP] = {}
+    Loc = Chr+":"+Stop
+    RefChange = Ref_Al+"/"+Alt_Al
+    ImpDict[PrSNP].update({ImpSNP: Loc+"_"+RefChange})
+    
             
 cnames=['SNP','GWAS','A','C','T','G']
 df = pd.DataFrame(columns=cnames)
@@ -120,8 +131,69 @@ for i in df_2.index.values:
     #print(Percentage)
     #print(BinaryList)
     Status = "neg"
+    ImpSNPNum = len(ImpDict[df_2.iloc[i]['SNP']])
+    ImpYes = 0
+    ImpNo = 0
     if df_2.iloc[i][df_2.iloc[i]['GWAS']]>ReadCutoff: ##if read cut-off a nucleotide must appear in at least 2 sequences to be counted thereby reducing the chance of a sequencing error being included
         Status = "pos"
+        #impSNPdict = {}
+        ##Check imputed SNPs here
+        print("For proxy SNP "+df_2.iloc[i]['SNP']+":")
+        for impSNP in ImpDict[df_2.iloc[i]['SNP']].keys():
+            FullLoc,RefChange = ImpDict[df_2.iloc[i]['SNP']][impSNP].split('_')
+            Chr,Loc = FullLoc.split(':')
+            Ref_Al,Alt_Al = RefChange.split('/')
+            
+            Loc = int(Loc)
+            start=Loc-ReadLength
+            end=Loc
+            BaseDict = {'A': 0, 'C': 0, 'T': 0, 'G': 0}
+            GetReads = subprocess.Popen("samtools view "+BAMfile+" "+Chr+":"+str(start)+"-"+str(end), shell=True, stdout=subprocess.PIPE)
+            SAMlines = GetReads.stdout.read().rstrip('\n').split('\n')
+            for j in SAMlines:
+                if j!="":
+                    parts = j.split('\t')
+                    ReadLoc = parts[3]
+                    CIGAR = parts[5]
+                    Align = re.findall('[0-9]*[A-Z]', CIGAR)
+                    Pos = Loc-int(ReadLoc)
+                    Seq = parts[9]
+                    if Align[0][-1:]=='M':
+                        CheckLen = int(Align[0][:-1])-1
+                        if (Pos>=0) & (Pos<=CheckLen):
+                            SeqBase = Seq[Pos]
+                            if (Seq[Pos]!='N'):
+                                BaseDict[SeqBase]+=1
+                            #if SeqBase not in impSNPdict[SNP].keys():
+                            #    impSNPdict[SNP].update({SeqBase: 1})
+                            #else:
+                            #    impSNPdict[SNP][SeqBase]+=1
+            if Alt_Al not in BaseDict.keys():
+                print("\tFor imputed SNP "+impSNP+", this code isn't smart enough yet to check if this alternative SNP allele exists")
+                ImpNo+=1
+            else:
+                if BaseDict[Alt_Al]>ReadCutoff:
+                    print("\tFor imputed SNP "+impSNP+", imputed SNP exists!")
+                    ImpYes+=1
+                else:
+                    print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
+                    ImpNo+=1
+        print("\tOut of a total of {0} imputed SNP, {1} were present and {2} were not".format(ImpSNPNum,ImpYes,ImpNo))
+                
+            #if bool(SNPdict[SNP])==False:
+                #x=1
+            #else:
+                #GWASCount = 0
+                #nGWASCount = 0
+                #BaseDict = {'A': 0, 'C': 0, 'T': 0, 'G': 0}
+                #for SNPbase in SNPdict[SNP].keys():
+                    #BaseDict[SNPbase]+=SNPdict[SNP][SNPbase]
+                #InsertList = [SNP,EA,BaseDict['A'],BaseDict['C'],BaseDict['T'],BaseDict['G']]
+                #df.loc[RowCounter] = InsertList
+                #RowCounter+=1
+        
+        #print(ImpDict[df_2.iloc[i]['SNP']])
+        
     Geno = "Hom"
     if Total>1:
         Geno = "Het"
@@ -134,6 +206,8 @@ for i in df_2.index.values:
 
 output = open(InputInitial+"_vDH-SNPinfo.txt","w")
 output.write("SNP name\t"+InputInitial+"\n")
+
+
 for ThisSNP in sorted(InfoDict.keys()):
     output.write(ThisSNP+"\t")
     if ThisSNP not in UserDict.keys():
@@ -190,4 +264,4 @@ while i<=3:
     i+=1
 plt.subplots_adjust(bottom=0.15,right=0.87)
 #plt.savefig("ST_SNP.png")
-plt.show()
+#plt.show()
