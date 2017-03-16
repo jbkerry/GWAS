@@ -50,7 +50,8 @@ cnames=['SNP','GWAS','A','C','T','G']
 df = pd.DataFrame(columns=cnames)
 RowCounter=0
 
-BAMfile = "/t1-data1/WTSA_Dev/jkerry/BloodATAC/"+InputInitial+"_input_sort.bam"
+#BAMfile = "/t1-data1/WTSA_Dev/jkerry/BloodATAC/"+InputInitial+"_input_sort.bam"
+BAMfile = "/t1-data1/WTSA_Dev/jkerry/BloodATAC/ATAC_K4_"+InputInitial+".sorted.bam"
 SNPdict = {}
 InfoDict = {}
 Lines = [x.rstrip('\n') for x in open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/vanDeHarst2012_SNPs_hg19.txt')]
@@ -113,6 +114,8 @@ for key, item in grouped_df:
     df_2.loc[Counter] = InsertList
     Counter+=1
 
+impSNPout = open(InputInitial+"_Hap.bed","w")
+prSNPout = open(InputInitial+"_vDH_SNPs.bed","w")
 ColumnList = ['A','C','T','G']
 ATots = []
 CTots = []
@@ -138,12 +141,12 @@ for i in df_2.index.values:
         Status = "pos"
         #impSNPdict = {}
         ##Check imputed SNPs here
-        print("For proxy SNP "+df_2.iloc[i]['SNP']+":")
+        #print("For proxy SNP "+df_2.iloc[i]['SNP']+":")
         for impSNP in ImpDict[df_2.iloc[i]['SNP']].keys():
             FullLoc,RefChange = ImpDict[df_2.iloc[i]['SNP']][impSNP].split('_')
             Chr,Loc = FullLoc.split(':')
             Ref_Al,Alt_Al = RefChange.split('/')
-            
+            newSeqLength = len(AltAl)
             Loc = int(Loc)
             start=Loc-ReadLength
             end=Loc
@@ -169,16 +172,19 @@ for i in df_2.index.values:
                             #else:
                             #    impSNPdict[SNP][SeqBase]+=1
             if Alt_Al not in BaseDict.keys():
-                print("\tFor imputed SNP "+impSNP+", this code isn't smart enough yet to check if this alternative SNP allele exists")
+                #print("\tFor imputed SNP "+impSNP+", this code isn't smart enough yet to check if this alternative SNP allele exists")
                 ImpNo+=1
+                impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t150\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
             else:
                 if BaseDict[Alt_Al]>ReadCutoff:
-                    print("\tFor imputed SNP "+impSNP+", imputed SNP exists!")
+                    #print("\tFor imputed SNP "+impSNP+", imputed SNP exists!")
                     ImpYes+=1
+                    impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t1000\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
                 else:
-                    print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
+                    #print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
                     ImpNo+=1
-        print("\tOut of a total of {0} imputed SNP, {1} were present and {2} were not".format(ImpSNPNum,ImpYes,ImpNo))
+                    impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t150\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
+        #print("\tOut of a total of {0} imputed SNP, {1} were present and {2} were not".format(ImpSNPNum,ImpYes,ImpNo))
                 
             #if bool(SNPdict[SNP])==False:
                 #x=1
@@ -203,7 +209,8 @@ for i in df_2.index.values:
     if Geno=="Ambiguous":
         String = Geno
     UserDict[df_2.iloc[i]['SNP']] = String
-
+impSNPout.close()
+prSNPout.close()
 output = open(InputInitial+"_vDH-SNPinfo.txt","w")
 output.write("SNP name\t"+InputInitial+"\n")
 
