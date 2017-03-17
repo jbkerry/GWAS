@@ -177,33 +177,32 @@ for i in df_2.index.values:
                             #    impSNPdict[SNP].update({SeqBase: 1})
                             #else:
                             #    impSNPdict[SNP][SeqBase]+=1
-            print("For imputed SNP "+impSNP+", bases = {0}".format(BaseDict))
+            #print("For imputed SNP "+impSNP+", bases = {0}".format(BaseDict))
             Each_Alt_Al = Alt_Al.split(',')
             RunningYes = 0
             RunningNo = 0
             for This_Alt_Al in Each_Alt_Al:
-                print(This_Alt_Al)
+                #print(This_Alt_Al)
                 if This_Alt_Al not in BaseDict.keys():
                 #print("\tFor imputed SNP "+impSNP+", this code isn't smart enough yet to check if this alternative SNP allele exists")
-                    ImpNo+=1
                     RunningNo+=1
-                    impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t250\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
                 else:
                     if BaseDict[This_Alt_Al]>ReadCutoff:
                         #print("\tFor imputed SNP "+impSNP+", imputed SNP exists!")
-                        ImpYes+=1
                         RunningYes+=1
-                        impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t1000\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
                     else:
                         #print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
-                        ImpNo+=1
                         RunningNo+=1
-                        impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t250\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
+                        
             if RunningYes>=1:
-                print("\tFor imputed SNP "+impSNP+", imputed SNP exists!")
+                #print("\tFor imputed SNP "+impSNP+", imputed SNP exists!")
+                impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t1000\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
+                ImpYes+=1
             else:
-                print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
-        #print("\tOut of a total of {0} imputed SNP, {1} were present and {2} were not".format(ImpSNPNum,ImpYes,ImpNo))
+                #print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
+                impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t250\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
+                ImpNo+=1
+        print("\tOut of a total of {0} imputed SNP, {1} were present and {2} were not".format(ImpSNPNum,ImpYes,ImpNo))
                 
             #if bool(SNPdict[SNP])==False:
                 #x=1
