@@ -43,7 +43,8 @@ for imputation in imputeLines:
         ImpDict[PrSNP] = {}
     Loc = Chr+":"+Stop
     RefChange = Ref_Al+"/"+Alt_Al
-    ImpDict[PrSNP].update({ImpSNP: Loc+"_"+RefChange})
+    if (len(Ref_Al)==1) & (len(Alt_Al)==1): # only include imputed SNP if it really is a SNP and not an indel
+        ImpDict[PrSNP].update({ImpSNP: Loc+"_"+RefChange})
     
             
 cnames=['SNP','GWAS','A','C','T','G']
@@ -58,7 +59,8 @@ Lines = [x.rstrip('\n') for x in open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/vanDe
 for i in Lines:
     Chr, SNP, Loc, Base, Genes = i.split('\t')
     SNPdict[SNP] = {}
-    InfoDict[SNP] = {}
+    Coor = Chr+":"+Loc
+    InfoDict[SNP] = Coor
     EA, OA = Base.split('/')
     chrNum=int(Chr[3:])
     Loc = int(Loc)
@@ -89,7 +91,8 @@ for i in Lines:
         nGWASCount = 0
         BaseDict = {'A': 0, 'C': 0, 'T': 0, 'G': 0}
         for SNPbase in SNPdict[SNP].keys():
-            BaseDict[SNPbase]+=SNPdict[SNP][SNPbase]
+            if SNPbase in BaseDict.keys():
+                BaseDict[SNPbase]+=SNPdict[SNP][SNPbase]
         InsertList = [SNP,EA,BaseDict['A'],BaseDict['C'],BaseDict['T'],BaseDict['G']]
         df.loc[RowCounter] = InsertList
         RowCounter+=1
@@ -139,6 +142,8 @@ for i in df_2.index.values:
     ImpNo = 0
     if df_2.iloc[i][df_2.iloc[i]['GWAS']]>ReadCutoff: ##if read cut-off a nucleotide must appear in at least 2 sequences to be counted thereby reducing the chance of a sequencing error being included
         Status = "pos"
+        prSNPChr,prSNPloc = InfoDict[df_2.iloc[i]['SNP']].split(':')
+        prSNPout.write("{0}\t{1}\t{2}\t{3}({4})\n".format(prSNPChr,int(prSNPloc)-1,prSNPloc,df_2.iloc[i]['SNP'],df_2.iloc[i]['GWAS']))
         #impSNPdict = {}
         ##Check imputed SNPs here
         print("For proxy SNP "+df_2.iloc[i]['SNP']+":")
@@ -289,4 +294,4 @@ while i<=3:
     i+=1
 plt.subplots_adjust(bottom=0.15,right=0.87)
 #plt.savefig("ST_SNP.png")
-#plt.show()
+plt.show()
