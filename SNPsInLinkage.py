@@ -125,6 +125,7 @@ CTots = []
 TTots = []
 GTots = []
 UserDict = {}
+CodeDict = {}
 for i in df_2.index.values:
     
     BinaryList = np.where(df_2.iloc[i][ColumnList]>ReadCutoff,1,0) ##if read cut-off a nucleotide must appear in at least 2 sequences to be counted thereby reducing the chance of a sequencing error being included
@@ -136,7 +137,7 @@ for i in df_2.index.values:
     GTots.append(Percentage[3])
     #print(Percentage)
     #print(BinaryList)
-    Status = "neg"
+    Status = "N"
     ImpSNPNum = len(ImpDict[df_2.iloc[i]['SNP']])
     ImpYes = 0
     ImpNo = 0
@@ -149,78 +150,89 @@ for i in df_2.index.values:
     ##Check imputed SNPs here
     PrImpSNPFullLoc,PrImpSNPRefChange = ImpDict[df_2.iloc[i]['SNP']][df_2.iloc[i]['SNP']].split('_')
     PrImpRefAl,PrImpAltAl = PrImpSNPRefChange.split('/')
-    print("For proxy SNP "+df_2.iloc[i]['SNP']+":")
-    print("Reference = {0}".format(PrImpRefAl))
+    Code = 0
+    #print("For proxy SNP "+df_2.iloc[i]['SNP']+":")
+    #print("\tReference = {0}, status = ".format(PrImpRefAl),end="")
     if df_2.iloc[i][PrImpRefAl]>ReadCutoff:
-        print("status = present")
-    print("ImputedSNP = {0}".format(PrImpAltAl))
+        #print("present")
+        Code+=1
+    #else:
+        #print("absent")
+    #print("\tImputedSNP = {0}, status = ".format(PrImpAltAl),end="")
     if df_2.iloc[i][PrImpAltAl]>ReadCutoff:
-        print("status = present")
-    print("EA = {0}".format(df_2.iloc[i]['GWAS']))
-    if df_2.iloc[i][df_2.iloc[i]['GWAS']]>ReadCutoff:
-        print("status = present")
-        
-    for impSNP in ImpDict[df_2.iloc[i]['SNP']].keys():
-        FullLoc,RefChange = ImpDict[df_2.iloc[i]['SNP']][impSNP].split('_')
-        Chr,Loc = FullLoc.split(':')
-        Ref_Al,Alt_Al = RefChange.split('/')
-        newSeqLengths = [len(x) for x in Alt_Al.split(',')]
-        #print("SVs = {0}, seq lengths = {1}".format(Alt_Al,newSeqLengths))
-        Loc = int(Loc)
-        start=Loc-ReadLength
-        end=Loc
-        #BaseDict = {'A': 0, 'C': 0, 'T': 0, 'G': 0}
-        BaseDict = {}
-        GetReads = subprocess.Popen("samtools view "+BAMfile+" "+Chr+":"+str(start)+"-"+str(end), shell=True, stdout=subprocess.PIPE)
-        SAMlines = GetReads.stdout.read().rstrip('\n').split('\n')
-        for j in SAMlines:
-            if j!="":
-                parts = j.split('\t')
-                ReadLoc = parts[3]
-                CIGAR = parts[5]
-                Align = re.findall('[0-9]*[A-Z]', CIGAR)
-                Pos = Loc-int(ReadLoc)
-                Seq = parts[9]
-                if Align[0][-1:]=='M':
-                    CheckLen = int(Align[0][:-1])-1
-                    if (Pos>=0) & (Pos<=CheckLen):
-                        for CurrentLength in newSeqLengths:
-                            EndPos = Pos + CurrentLength
-                            SeqBase = Seq[Pos:EndPos]
-                            if SeqBase not in BaseDict.keys():
-                                BaseDict[SeqBase]=1
-                            else:
-                                BaseDict[SeqBase]+=1
-                        #if SeqBase not in impSNPdict[SNP].keys():
-                        #    impSNPdict[SNP].update({SeqBase: 1})
-                        #else:
-                        #    impSNPdict[SNP][SeqBase]+=1
-        #print("For imputed SNP "+impSNP+", bases = {0}".format(BaseDict))
-        Each_Alt_Al = Alt_Al.split(',')
-        RunningYes = 0
-        RunningNo = 0
-        for This_Alt_Al in Each_Alt_Al:
-            #print(This_Alt_Al)
-            if This_Alt_Al not in BaseDict.keys():
-            #print("\tFor imputed SNP "+impSNP+", this code isn't smart enough yet to check if this alternative SNP allele exists")
-                RunningNo+=1
-            else:
-                if BaseDict[This_Alt_Al]>ReadCutoff:
-                    #print("\tFor imputed SNP "+impSNP+", imputed SNP exists!")
-                    RunningYes+=1
-                else:
-                    #print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
+        #print("present")
+        Code+=10
+    #else:
+        #print("absent")
+    #print("\tEA = {0}, status = ".format(df_2.iloc[i]['GWAS']),end="")
+    #if df_2.iloc[i][df_2.iloc[i]['GWAS']]>ReadCutoff:
+        #print("present")
+    #else:
+        #print("absent")
+    CodeDict[df_2.iloc[i]['SNP']]=Code
+    if df_2.iloc[i][df_2.iloc[i]['GWAS']]>ReadCutoff: # Will only check imputed SNPs if vDH EA is present. Alter this IF statement to include other groups like the imputed SNP change, if different   
+        Status = "Y"
+        for impSNP in ImpDict[df_2.iloc[i]['SNP']].keys():
+            FullLoc,RefChange = ImpDict[df_2.iloc[i]['SNP']][impSNP].split('_')
+            Chr,Loc = FullLoc.split(':')
+            Ref_Al,Alt_Al = RefChange.split('/')
+            newSeqLengths = [len(x) for x in Alt_Al.split(',')]
+            #print("SVs = {0}, seq lengths = {1}".format(Alt_Al,newSeqLengths))
+            Loc = int(Loc)
+            start=Loc-ReadLength
+            end=Loc
+            #BaseDict = {'A': 0, 'C': 0, 'T': 0, 'G': 0}
+            BaseDict = {}
+            GetReads = subprocess.Popen("samtools view "+BAMfile+" "+Chr+":"+str(start)+"-"+str(end), shell=True, stdout=subprocess.PIPE)
+            SAMlines = GetReads.stdout.read().rstrip('\n').split('\n')
+            for j in SAMlines:
+                if j!="":
+                    parts = j.split('\t')
+                    ReadLoc = parts[3]
+                    CIGAR = parts[5]
+                    Align = re.findall('[0-9]*[A-Z]', CIGAR)
+                    Pos = Loc-int(ReadLoc)
+                    Seq = parts[9]
+                    if Align[0][-1:]=='M':
+                        CheckLen = int(Align[0][:-1])-1
+                        if (Pos>=0) & (Pos<=CheckLen):
+                            for CurrentLength in newSeqLengths:
+                                EndPos = Pos + CurrentLength
+                                SeqBase = Seq[Pos:EndPos]
+                                if SeqBase not in BaseDict.keys():
+                                    BaseDict[SeqBase]=1
+                                else:
+                                    BaseDict[SeqBase]+=1
+                            #if SeqBase not in impSNPdict[SNP].keys():
+                            #    impSNPdict[SNP].update({SeqBase: 1})
+                            #else:
+                            #    impSNPdict[SNP][SeqBase]+=1
+            #print("For imputed SNP "+impSNP+", bases = {0}".format(BaseDict))
+            Each_Alt_Al = Alt_Al.split(',')
+            RunningYes = 0
+            RunningNo = 0
+            for This_Alt_Al in Each_Alt_Al:
+                #print(This_Alt_Al)
+                if This_Alt_Al not in BaseDict.keys():
+                #print("\tFor imputed SNP "+impSNP+", this code isn't smart enough yet to check if this alternative SNP allele exists")
                     RunningNo+=1
-                    
-        if RunningYes>=1:
-            #print("\tFor imputed SNP "+impSNP+", imputed SNP exists!")
-            impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t1000\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
-            ImpYes+=1
-        else:
-            #print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
-            impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t250\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
-            ImpNo+=1
-    print("\tOut of a total of {0} imputed SNP, {1} were present and {2} were not".format(ImpSNPNum,ImpYes,ImpNo))
+                else:
+                    if BaseDict[This_Alt_Al]>ReadCutoff:
+                        #print("\tFor imputed SNP "+impSNP+", imputed SNP exists!")
+                        RunningYes+=1
+                    else:
+                        #print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
+                        RunningNo+=1
+                        
+            if RunningYes>=1:
+                #print("\tFor imputed SNP "+impSNP+", imputed SNP exists!")
+                impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t1000\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
+                ImpYes+=1
+            else:
+                #print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
+                impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t250\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
+                ImpNo+=1
+        #print("\tOut of a total of {0} imputed SNP, {1} were present and {2} were not".format(ImpSNPNum,ImpYes,ImpNo))
                 
             #if bool(SNPdict[SNP])==False:
                 #x=1
@@ -241,14 +253,14 @@ for i in df_2.index.values:
         Geno = "Het"
     elif Total==0:
         Geno = "Ambiguous"
-    String = Geno+", "+Status
+    String = Geno+","+Status
     if Geno=="Ambiguous":
         String = Geno
     UserDict[df_2.iloc[i]['SNP']] = String
 impSNPout.close()
 prSNPout.close()
 output = open(InputInitial+"_vDH-SNPinfo.txt","w")
-output.write("SNP name\t"+InputInitial+"\n")
+output.write("SNP name\tHet/Hom\tRef/SNP\tvDH EA\n")
 
 
 for ThisSNP in sorted(InfoDict.keys()):
@@ -256,7 +268,22 @@ for ThisSNP in sorted(InfoDict.keys()):
     if ThisSNP not in UserDict.keys():
         output.write("not detected\n")
     else:
-        output.write(UserDict[ThisSNP]+"\n")
+        if UserDict[ThisSNP]!="Ambiguous":
+            Geno,Status = UserDict[ThisSNP].split(',')
+            Comp = "N/A"
+            if Geno=="Hom":
+                if CodeDict[ThisSNP]==1:
+                    Comp = "ref"
+                elif CodeDict[ThisSNP]==10:
+                    Comp = "SNP"
+                else:
+                    Comp = "error"
+        else:
+            Geno = "Ambiguous"
+            Comp = "N/A"
+            Status = "-"
+        
+        output.write("{0}\t{1}\t{2}\n".format(Geno,Comp,Status))
 output.close()
 
 #print(df_2[:20])
