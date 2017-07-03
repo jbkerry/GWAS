@@ -36,6 +36,7 @@ else:
             sys.exit(2)
 
 ImpDict = {}
+LDSNP_num = {}
 imputeLines = [x.rstrip('\n') for x in open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/Ron_imputed_SNPs.txt')]
 for imputation in imputeLines:
     Chr, Start, Stop, ImpSNP, Ref_Al, Alt_Al, PrSNP, Desc, Type = imputation.split('\t')
@@ -117,8 +118,8 @@ for key, item in grouped_df:
     df_2.loc[Counter] = InsertList
     Counter+=1
 
-impSNPout = open(InputInitial+"_Hap.bed","w")
-prSNPout = open(InputInitial+"_vDH_SNPs.bed","w")
+impSNPout = open(InputInitial+"_Hap_c"+str(ReadCutoff)+".bed","w")
+prSNPout = open(InputInitial+"_vDH_SNPs_c"+str(ReadCutoff)+".bed","w")
 ColumnList = ['A','C','T','G']
 ATots = []
 CTots = []
@@ -232,6 +233,8 @@ for i in df_2.index.values:
                 #print("\tFor imputed SNP "+impSNP+", imputed SNP does not exist")
                 impSNPout.write("{0}\t{1}\t{2}\t{3}({4})\t250\n".format(Chr,Loc-1,Loc,impSNP,df_2.iloc[i]['SNP']))
                 ImpNo+=1
+        Collate = str(ImpSNPNum)+"_"+str(ImpYes)+"_"+str(ImpNo)
+        LDSNP_num[df_2.iloc[i]['SNP']] = Collate
         #print("\tOut of a total of {0} imputed SNP, {1} were present and {2} were not".format(ImpSNPNum,ImpYes,ImpNo))
                 
             #if bool(SNPdict[SNP])==False:
@@ -259,31 +262,37 @@ for i in df_2.index.values:
     UserDict[df_2.iloc[i]['SNP']] = String
 impSNPout.close()
 prSNPout.close()
-output = open(InputInitial+"_vDH-SNPinfo.txt","w")
-output.write("SNP name\tHet/Hom\tRef/SNP\tvDH EA\n")
+output = open(InputInitial+"_vDH-SNPinfo_c"+str(ReadCutoff)+".txt","w")
+output.write(InputInitial+", read cutoff>"+str(ReadCutoff)+"\n")
+output.write("SNP name\tHet/Hom\tref/alt\tvDH EA\tLD SNPs\n")
 
 
 for ThisSNP in sorted(InfoDict.keys()):
     output.write(ThisSNP+"\t")
     if ThisSNP not in UserDict.keys():
-        output.write("not detected\n")
+        output.write("not detected\t-\t-\t-\n")
     else:
         if UserDict[ThisSNP]!="Ambiguous":
             Geno,Status = UserDict[ThisSNP].split(',')
-            Comp = "N/A"
+            Comp = "n/a"
             if Geno=="Hom":
                 if CodeDict[ThisSNP]==1:
                     Comp = "ref"
                 elif CodeDict[ThisSNP]==10:
-                    Comp = "SNP"
+                    Comp = "alt"
                 else:
                     Comp = "error"
+            LD = "n/a"
+            if Status=="Y":
+                TLD,YLD,NLD = LDSNP_num[ThisSNP].split('_')
+                LD = YLD+"/"+TLD
         else:
             Geno = "Ambiguous"
-            Comp = "N/A"
+            Comp = "-"
             Status = "-"
+            LD = "-"
         
-        output.write("{0}\t{1}\t{2}\n".format(Geno,Comp,Status))
+        output.write("{0}\t{1}\t{2}\t{3}\n".format(Geno,Comp,Status,LD))
 output.close()
 
 #print(df_2[:20])
@@ -334,4 +343,4 @@ while i<=3:
     i+=1
 plt.subplots_adjust(bottom=0.15,right=0.87)
 #plt.savefig("ST_SNP.png")
-plt.show()
+#plt.show()
