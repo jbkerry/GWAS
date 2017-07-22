@@ -12,8 +12,9 @@ def get_snp_coor(ext, snp_file, bed_dir):
     for key in df_dict:
         df = pd.read_table(key+ext, header=1)
         df_dict[key] = df
+    p = re.compile('_(?P<initials>[CJS][DHT])_*_d(?P<day>\d{1,2})_')
     bed_files = [x for x in os.listdir(bed_dir) if x.endswith('.bed')]
-    p = re.compile('_(?P<initials>[CJS][DHT])_*_(?P<day>d\d{1,2})_')
+    bed_files.sort(key=lambda x: int(p.search(x).group('day')))
     for x in bed_files:
         m = p.search(x)
         bed_file = os.path.join(bed_dir, x)
@@ -34,7 +35,7 @@ def get_snp_coor(ext, snp_file, bed_dir):
         else:
             atac = ['No']*df_dict[m.group('initials')].shape[0]
             #print('low')
-        new_col = 'ATAC_{}'.format(m.group('day'))
+        new_col = 'ATAC_d{}'.format(m.group('day'))
         df_dict[m.group('initials')][new_col] = atac
         
     return df_dict
