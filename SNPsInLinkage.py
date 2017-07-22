@@ -1,103 +1,107 @@
-#!/usr/bin/env python
+from __future__ import print_function, division
 
-from __future__ import print_function,division
+import re
+import subprocess
+import math
+import sys
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import argparse
+import pysam
 from scipy import stats
-import re,subprocess,pandas as pd, numpy as np, matplotlib.pyplot as plt, math, matplotlib.patches as mpatches, sys, getopt
 
-def usage():
-    print("usage: PlotSNPs.py -i <initials of person> -r <read length (bp)> -c <read count cut-off>")
-
-try:
-    opts, args = getopt.getopt(sys.argv[1:], 'i:r:c:h',)
-except getopt.GetoptError:
-    usage()
-    sys.exit(2)
-
-InputInitial = ""
-ReadLength = 0
-ReadCutoff = 0
+def group_imputations():
+    """Generates dictionary with every proximal SNP as a key referencing
+    a dictionary with every linked imputed SNP as key with that SNP's
+    location and base change as a value
     
-if not opts:
-    usage()
-    sys.exit(2)
-else:
-    for opt, arg in opts:
-        if opt=='-h':
-            usage()
-            sys.exit(2)
-        elif opt=='-i':
-            InputInitial = arg
-        elif opt=='-r':
-            ReadLength = int(arg)
-        elif opt=='-c':
-            ReadCutoff = int(arg)
-        else:
-            usage()
-            sys.exit(2)
-
-ImpDict = {}
-LDSNP_num = {}
-imputeLines = [x.rstrip('\n') for x in open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/Ron_imputed_SNPs.txt')]
-for imputation in imputeLines:
-    Chr, Start, Stop, ImpSNP, Ref_Al, Alt_Al, PrSNP, Desc, Type = imputation.split('\t')
-    if PrSNP not in ImpDict.keys():
-        ImpDict[PrSNP] = {}
-    Loc = Chr+":"+Stop
-    RefChange = Ref_Al+"/"+Alt_Al
-    if (len(Ref_Al)==1) & (len(Alt_Al)==1): # only include imputed SNP if it really is a SNP and not an indel
-        ImpDict[PrSNP].update({ImpSNP: Loc+"_"+RefChange})
+    Returns
+    -------
+    imp_dict : dict
+        Contains imputed SNPs linked to proximal SNPs
     
-            
-cnames=['SNP','GWAS','A','C','T','G']
-df = pd.DataFrame(columns=cnames)
-RowCounter=0
+    """
+    
+    imp_dict = {}
+    with open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/Ron_imputed_SNPs.txt') as f:
+        for x in f:
+            (chr_name, start, stop, imp_snp, ref_al, alt_al,
+             pr_snp, desc, snp_type) = x.strip().split('\t')
+            if pr_snp not in imp_dict:
+                imp_dict[pr_snp] = {}
+            loc = ':'.join((chr_name, stop))
+            ref_change = "/".join((ref_al, alt_al))
+            if (len(ref_al)==1) & (len(alt_al)==1):  # only include imputed SNP if it really is a SNP and not an indel
+                imp_dict[pr_snp].update({imp_snp: loc+"_"+ref_change})
+    
+    return imp_dict
+    
 
-#BAMfile = "/t1-data1/WTSA_Dev/jkerry/BloodATAC/"+InputInitial+"_input_sort.bam"
-BAMfile = "/t1-data1/WTSA_Dev/jkerry/BloodATAC/ATAC_K4_"+InputInitial+".sorted.bam"
-SNPdict = {}
-InfoDict = {}
-Lines = [x.rstrip('\n') for x in open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/vanDeHarst2012_SNPs_hg19.txt')]
-for i in Lines:
-    Chr, SNP, Loc, Base, Genes = i.split('\t')
-    SNPdict[SNP] = {}
-    Coor = Chr+":"+Loc
-    InfoDict[SNP] = Coor
-    EA, OA = Base.split('/')
-    chrNum=int(Chr[3:])
-    Loc = int(Loc)
-    start=Loc-ReadLength
-    end=Loc
-    GetReads = subprocess.Popen("samtools view "+BAMfile+" chr"+str(chrNum)+":"+str(start)+"-"+str(end), shell=True, stdout=subprocess.PIPE)
-    SAMlines = GetReads.stdout.read().rstrip('\n').split('\n')
-    for j in SAMlines:
-        if j!="":
-            parts = j.split('\t')
-            ReadLoc = parts[3]
-            CIGAR = parts[5]
-            Align = re.findall('[0-9]*[A-Z]', CIGAR)
-            Pos = Loc-int(ReadLoc)
-            Seq = parts[9]
-            if Align[0][-1:]=='M':
-                CheckLen = int(Align[0][:-1])-1
-                if (Pos>=0) & (Pos<=CheckLen):
-                    SeqBase = Seq[Pos]
-                    if SeqBase not in SNPdict[SNP].keys():
-                        SNPdict[SNP].update({SeqBase: 1})
-                    else:
-                        SNPdict[SNP][SeqBase]+=1
-    if bool(SNPdict[SNP])==False:
-        x =1
-    else:
-        GWASCount = 0
-        nGWASCount = 0
-        BaseDict = {'A': 0, 'C': 0, 'T': 0, 'G': 0}
-        for SNPbase in SNPdict[SNP].keys():
-            if SNPbase in BaseDict.keys():
-                BaseDict[SNPbase]+=SNPdict[SNP][SNPbase]
-        InsertList = [SNP,EA,BaseDict['A'],BaseDict['C'],BaseDict['T'],BaseDict['G']]
-        df.loc[RowCounter] = InsertList
-        RowCounter+=1
+def match_vdh_to_ngs(initials, length):
+    """Determines if any of the van De Harst 75 SNPs are in the
+    specified NGS sequencing file
+    
+    Parameters
+    ----------
+    initials : str
+        Initials of the individual who has been sequenced
+    length : int
+        Read length of the sequences
+        
+    """
+    
+    cnames=('SNP', 'GWAS', 'A', 'C', 'T', 'G')
+    df = pd.DataFrame(columns=cnames)
+    
+    bam = '/t1-data1/WTSA_Dev/jkerry/BloodATAC/ATAC_K4_{}.sorted.bam'.format(
+        initials
+    )
+    
+    snp_dict = {}
+    info_dict = {}
+    
+    with open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/' \
+              'vanDeHarst2012_SNPs_hg19.txt') as f:
+        for x in f:
+            chr_name, snp, loc, base, genes = x.strip().split('\t')
+            snp_dict[snp] = {}
+            coor = ':'.join((chr_name, loc))
+            info_dict[snp] = coor
+            ea, oa = base.split('/')
+            chr_num = int(chr_name[3:])
+            loc = int(loc)
+            start = loc - length
+            stop = loc
             
+            sf = pysam.AlignmentFile(bam, 'rb')
+            for r in sf.fetch(chr_name, start, stop):
+                pos = loc-(r.reference_start+1)
+                seq = r.query_sequence
+                if r.cigartuples[0][0]==0:
+                    m_len = r.cigartuples[0][1]-1
+                    if (pos>=0) & (pos<=m_len):
+                        seq_base = seq[pos]
+                        snp_dict[snp][seq_base] = snp_dict[snp].get(
+                            seq_base, 0) + 1
+                        
+            if snp_dict[snp]:
+                GWASCount = 0
+                nGWASCount = 0
+                base_dict = {'A': 0, 'C': 0, 'T': 0, 'G': 0}
+                for snp_base in snp_dict[snp]:
+                    if snp_base in base_dict:
+                        base_dict[snp_base]+=snp_dict[snp][snp_base]
+                df = df.append({'SNP': snp,
+                                'GWAS': ea,
+                                'A': base_dict['A'],
+                                'C': base_dict['C'],
+                                'T': base_dict['T'],
+                                'G': base_dict['G']}, ignore_index=True)
+    
+    return df
 
 
 ## at this point the script has read to each read and matched it to a SNP location where possible. For a given SNP it has calculated how many times the nucleotide matches that in the vanDeHarst paper or one of the other 3 nucleotides.
@@ -344,3 +348,30 @@ while i<=3:
 plt.subplots_adjust(bottom=0.15,right=0.87)
 #plt.savefig("ST_SNP.png")
 #plt.show()
+
+if __name__ == '__main__':
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-i',
+        '--initials',
+        type = str,
+        help = 'Initials of person.',
+        required = True,
+    )
+    parser.add_argument(
+        '-r',
+        '--read_length',
+        type = int,
+        help = 'Read length (bp)',
+        required = True,
+    )
+    parser.add_argument(
+        '-c',
+        '--cut_off',
+        type = int,
+        help = 'Sequencing depth minimum threshold',
+        required = True,
+    )
+    
+    args = parser.parse_args()
