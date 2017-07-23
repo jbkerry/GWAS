@@ -35,7 +35,8 @@ def group_imputations():
             loc = ':'.join((chr_name, stop))
             ref_change = '/'.join((ref_al, alt_al))
             if (len(ref_al)==1) & (len(alt_al)==1):  # only include imputed SNP if it really is a SNP and not an indel
-                imp_dict[pr_snp].update({imp_snp: '_'.join((loc, ref_change))})
+                #imp_dict[pr_snp].update({imp_snp: '_'.join((loc, ref_change))})
+                imp_dict[pr_snp][imp_snp] = '_'.join((loc, ref_change))
     
     return imp_dict
     
@@ -63,7 +64,7 @@ def match_vdh_to_ngs(initials, length):
     snp_dict = {}
     info_dict = {}
     
-    with open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/' \
+    with open('/t1-data1/WTSA_Dev/jkerry/BloodATAC/'
               'vanDeHarst2012_SNPs_hg19.txt') as f:
         for x in f:
             chr_name, snp, loc, base, genes = x.strip().split('\t')
