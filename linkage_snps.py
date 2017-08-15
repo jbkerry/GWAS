@@ -1,17 +1,14 @@
 from __future__ import print_function, division
 
+import argparse
+import math
 import re
 import subprocess
-import math
 import sys
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import argparse
 import pysam
-from scipy import stats
 
 class DetectGwasSnps(object):
     """Explanation here
@@ -32,13 +29,14 @@ class DetectGwasSnps(object):
         
     """
     
-    def __init__(self, initials, length, cutoff):
+    def __init__(self, initials, length, cutoff, bam):
         self.initials = initials
         self.length = length
         self.cutoff = cutoff
-        self._bam = '/t1-data1/WTSA_Dev/jkerry/BloodATAC/ATAC_K4_{}.sorted.bam'.format(
-            self.initials
-        )
+        self._bam = bam
+        #self._bam = '/t1-data1/WTSA_Dev/jkerry/BloodATAC/ATAC_K4_{}.sorted.bam'.format(
+        #    self.initials
+        #)
 
 
     def group_imputations(self):
@@ -132,6 +130,7 @@ class DetectGwasSnps(object):
         g_tot = []
         self._user_dict = {}
         self._code_dict = {}
+        self._ld_snp_num = {}
         for i, row in self.df.iterrows():
             
             curr_snp = row['SNP']
@@ -216,8 +215,7 @@ class DetectGwasSnps(object):
                     imp_snp_out.write('{}\n'.format('\t'.join(map(str, write_tup))))
                 
                 collate = '_'.join(map(str, (imp_snp_num, imp_yes, imp_no)))
-                ld_snp_num = {}
-                ld_snp_num[curr_snp] = collate
+                self._ld_snp_num[curr_snp] = collate
                 
             geno = 'Hom'
             if total > 1:
@@ -233,6 +231,46 @@ class DetectGwasSnps(object):
         pr_snp_out.close()
         
         return
+    
+    def print_genotype(self):
+        
+        main_out = open('{}_vDH-SNPinfo_c{}.txt'.format(self.initials,
+                                                        self.cutoff), 'w')
+        main_out.write('{}, read cut-off>{}\n'.format(self.initials,
+                                                      self.cutoff))
+        main_out.write('SNP name\tHet/Hom\tref/alt\tvDH EA\tLD SNPs\n')
+        for this_snp in sorted(self._info_dict):
+            main_out.write('{}\t'.format(this_snp))
+            if this_snp not in self._user_dict:
+                main_out.write('not detected\t-\t-\t-\n')
+            else:
+                if self._user_dict[this_snp] != 'Ambiguous':
+                    geno, status = self._user_dict[this_snp].split(',')
+                    comp = 'n/a'
+                    if geno == 'Hom':
+                        if self._code_dict[this_snp] == 1:
+                            comp = 'ref'
+                        elif self._code_dict[this_snp] == 10:
+                            comp = 'alt'
+                        else:
+                            comp = 'error'
+                    ld = 'n/a'
+                    if status == 'Y':
+                        tld, yld, nld = self._ld_snp_num[this_snp].split('_')
+                        ld = '{}/{}'.format(yld, tld)
+                else:
+                    geno = 'Ambiguous'
+                    comp = '-'
+                    status = '-'
+                    ld = '-'
+                
+                main_out.write('{}\n'.format('\t'.join([geno, comp,
+                                                        status, ld])))
+        
+        main_out.close()
+        
+        return
+            
 
 ### To here
     
@@ -343,5 +381,21 @@ if __name__ == '__main__':
         help = 'Sequencing depth minimum threshold',
         required = True,
     )
+    parser.add_argument(
+        '-b',
+        '--bam',
+        type = str,
+        help = 'Path to bam file',
+        required = True,
+    )
     
     args = parser.parse_args()
+    run = DetectGwasSnps(initials=args.initials,
+                         length=args.read_length,
+                         cutoff=args.cutoff,
+                         bam=args.bam)
+    run.group_imputations()
+    run.match_vdh_to_ngs()
+    run.get_genotype()
+    run.print_genotype()
+    
