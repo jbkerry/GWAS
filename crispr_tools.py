@@ -9,18 +9,34 @@ import re
 import shutil
 import subprocess
 
-silents = {'1': (),
+silents = {'1A': ('7578495-C-G', '7578498-C-T', '7578501-C-G', '7578504-A-T',
+                  '7578507-G-T', '7578510-G-C', '7578513-C-T', '7578516-G-A',
+                  '7578519-C-A', '7578534-C-T'),
+           '1C': ('7578495-C-G', '7578498-C-T', '7578501-C-G', '7578504-A-T',
+                  '7578510-G-C', '7578513-C-T', '7578516-G-A', '7578519-C-A',
+                  '7578534-C-T'),
+           '1G': ('7578495-C-G', '7578498-C-T', '7578501-C-G', '7578504-A-T',
+                  '7578507-G-C', '7578510-G-C', '7578513-C-T', '7578516-G-A',
+                  '7578519-C-A', '7578534-C-T'),
+           '1T': ('7578495-C-G', '7578498-C-T', '7578501-C-G', '7578504-A-T',
+                  '7578507-G-A', '7578510-G-C', '7578513-C-T', '7578516-G-A',
+                  '7578519-C-A', '7578534-C-T'),
            '2': ('7578498-C-T', '7578504-A-T', '7578510-G-C', '7578516-G-A',
-                 '7578519-C-A', '7578523-TGG-TGGG', '7578524-GG-GGG', '7578534-C-T'),
-           '3': (),
-           '4': ()}
+                 '7578519-C-A', '7578523-TGG-TGGG', '7578524-GG-GGG',
+                 '7578534-C-T'),
+           '3': ('7578495-C-G', '7578501-C-G', '7578507-G-A', '7578513-C-T',
+                 '7578519-C-A', '7578534-C-T'),
+           'A-wt': ('31022633-T-C', '31022636-C-T', '31022642-C-T',
+                    '31022643-G-T', '31022657-C-A', '31022660-A-G'),
+           'A-mut': ('31022633-T-C', '31022636-C-T', '31022642-C-T',
+                     '31022657-C-A', '31022660-A-G')}
 vep_cmd = 'module load ensembl-api/20170130\nperl /package/ensembl/20170130/' \
           'ensembl-tools/scripts/variant_effect_predictor/variant_effect_' \
           'predictor.pl --database --assembly GRCh37 --port 3337 --polyphen b ' \
           '--sift b --force_overwrite'
 
 def collapse_vcfs(oligo, v_dir='.'):
-    vcf_list = [x for x in os.listdir(v_dir) if x.endswith('.vcf')]
+    vcf_list = [x for x in os.listdir(v_dir) if (x.endswith('.vcf')) & (x!='test.vcf')]
     vcf_dict = {}
     bar_dict = {}
     bar_collapse = [0, 0]
@@ -178,8 +194,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '-o',
         '--oligo',
-        type = int,
-        choices = [1, 2, 3, 4],
+        type = str,
+        choices = ['1A', '1C', '1G', '1T', '2', '3', 'A-wt', 'A-mut'],
         help = 'The number of the oligo',
         required = True,
     )
