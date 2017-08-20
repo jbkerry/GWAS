@@ -187,11 +187,11 @@ def run_vep(vcf_dict, oligo, v_dir='.', verbose=False, keep_vep=False):
                 break
     
     if not keep_vep: shutil.rmtree('_Inline')
-    print('{1} VEP output files had only non-deleterious mutations and were '
-          'stored in the ./NON-DELETERIOUS/ directory ({1} unique events, {2} '
-          'total events)\n{3} VEP output files had at least one deleterious '
-          'mutation and were stored in the ./DELETERIOUS/ directory ({3} '
-          'unique events, {4} total events).'.format(nondel_count,
+    print('{0} VEP output files had only non-deleterious mutations and were '
+          'stored in the ./NON-DELETERIOUS/ directory ({0} unique events, {1} '
+          'total events)\n{2} VEP output files had at least one deleterious '
+          'mutation and were stored in the ./DELETERIOUS/ directory ({2} '
+          'unique events, {3} total events).'.format(nondel_count,
                 nondel_total_count, del_count, del_total_count))
     return None
 
