@@ -6,6 +6,7 @@ MaxCount=$(($sam_lines+1))
 while [ $HighCount -lt $MaxCount ]; do
     readName=$(awk 'FNR=='$LowCount' {print $1}' $sam_file)
     readNum=$(awk 'FNR>='$LowCount' && FNR<='$HighCount $sam_file | grep $readName | wc -l)
+    ##readNum=$(awk 'FNR>='$LowCount' && FNR<='$HighCount $sam_file | grep $readName | wc -l)
     if [ $readNum -eq 1 ]
     then
         let LowCount=LowCount+1

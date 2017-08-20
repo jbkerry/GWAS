@@ -89,8 +89,7 @@ def run_vep(vcf_dict, oligo, v_dir='.', verbose=False, keep_vep=False):
     
     total = len(vcf_dict)
     counter = 0
-    del_count = 0
-    nondel_count = 0
+    del_count = nondel_count = del_total_count = nondel_total_count = 0
     print('Starting VEP runs...')
     
     if not os.path.exists('./DELETERIOUS'): os.mkdir('./DELETERIOUS')
@@ -110,7 +109,8 @@ def run_vep(vcf_dict, oligo, v_dir='.', verbose=False, keep_vep=False):
         if verbose: print('\t...complete')
         
         outstring = ''
-        deleterious = 0
+        deleterious = False
+        ambiguous = False
         score_dict = {}
         with open(outfile) as f:
             for x in f:
@@ -125,7 +125,7 @@ def run_vep(vcf_dict, oligo, v_dir='.', verbose=False, keep_vep=False):
                     pp_term = m2.group('pp')
                     if (ss<0.05) | (pps>=0.15):
                         effect = 'DELETERIOUS'
-                        deleterious = 1
+                        deleterious = True
                     else:
                         effect = 'NON-DELETERIOUS'
                 else:
@@ -133,34 +133,47 @@ def run_vep(vcf_dict, oligo, v_dir='.', verbose=False, keep_vep=False):
                     pps = pp_term = '-'
                     effect = 'NON-DELETERIOUS'
                 chr_num, base, var = cols[0].split('_')
-                ref, alt = var.split('/')
+                try:
+                    ref, alt = var.split('/')
+                except ValueError:
+                    print('Ambigous mutation detected in {}. Skipping.'.format(
+                        j[1]))
+                    ambiguous = True
+                    break
                 list_id = '-'.join([base, ref, alt])
+                if (ref == '-') | (alt == '-') | (len(ref) != len(alt)):
+                    if list_id not in silents[oligo]:
+                        effect = 'INDEL'
+                        deleterious = True
                 if list_id in silents[oligo]: effect = 'BARCODE'
                 if cols[0] not in score_dict:
                     score_dict[cols[0]] = (cols[0], ss, s_term, pps, pp_term, effect)
-                elif (effect == 'DELETERIOUS') & (score_dict[cols[0]][3] != 'DELETERIOUS'):
+                elif (effect == 'DELETERIOUS') & (score_dict[cols[0]][5] != 'DELETERIOUS'):
                     score_dict[cols[0]] = (cols[0], ss, s_term, pps, pp_term, effect)
                 elif (ss != '-') & (pps != '-'):
-                    if (score_dict[cols[0]][1]=='-') & (score_dict[cols[0]][2]=='-'):
+                    if (score_dict[cols[0]][1]=='-') & (score_dict[cols[0]][3]=='-'):
                         score_dict[cols[0]] = (cols[0], ss, s_term, pps, pp_term, effect)
-                    elif (ss < score_dict[cols[0]][1]) & (pps > score_dict[cols[0]][2]):
+                    elif (ss < score_dict[cols[0]][1]) & (pps > score_dict[cols[0]][3]):
                         score_dict[cols[0]] = (cols[0], ss, s_term, pps, pp_term, effect)
-        for key, item in score_dict.items():
-            outstring = '\n'.join([outstring, '\t'.join(map(str, item))])
-        out_file = 'mut_id{}_{}.txt'.format(m.group('file_num'), j[0])
-        if deleterious == 1:
-            out_dir = './DELETERIOUS'
-            del_count+=1
-        else:
-            out_dir = './NON-DELETERIOUS'
-            nondel_count+=1
-            
-        with open(os.path.join(out_dir, out_file), 'w') as f_out:
-            f_out.write('Variant\tSIFT_score\tSIFT_term\tPolyPhen_score\tPolyPhen_term\tErica_term\n')
-            f_out.write('{}\n'.format(outstring.lstrip()))
-        if verbose:
-            print('Collapsed idential variants and wrote results to {} in '
-                  '{}\n'.format(out_file, out_dir))
+        if not ambiguous:
+            for key, item in score_dict.items():
+                outstring = '\n'.join([outstring, '\t'.join(map(str, item))])
+            out_file = 'mut_id{}_{}.txt'.format(m.group('file_num'), j[0])
+            if deleterious:
+                out_dir = './DELETERIOUS'
+                del_count += 1
+                del_total_count += j[0]
+            else:
+                out_dir = './NON-DELETERIOUS'
+                nondel_count += 1
+                nondel_total_count += j[0]
+                
+            with open(os.path.join(out_dir, out_file), 'w') as f_out:
+                f_out.write('Variant\tSIFT_score\tSIFT_term\tPolyPhen_score\tPolyPhen_term\tErica_term\n')
+                f_out.write('{}\n'.format(outstring.lstrip()))
+            if verbose:
+                print('Collapsed idential variants and wrote results to {} in '
+                      '{}\n'.format(out_file, out_dir))
         if not keep_vep:    
             os.remove(outfile)
             os.remove('{}_summary.html'.format(outfile))
@@ -174,10 +187,12 @@ def run_vep(vcf_dict, oligo, v_dir='.', verbose=False, keep_vep=False):
                 break
     
     if not keep_vep: shutil.rmtree('_Inline')
-    print('{} VEP output files had only non-deleterious mutations and were '
-          'stored in the ./NON-DELETERIOUS/ directory\n{} VEP output files had '
-          'at least one deleterious mutation and were stored in the '
-          './DELETERIOUS/ directory.'.format(nondel_count, del_count))
+    print('{1} VEP output files had only non-deleterious mutations and were '
+          'stored in the ./NON-DELETERIOUS/ directory ({1} unique events, {2} '
+          'total events)\n{3} VEP output files had at least one deleterious '
+          'mutation and were stored in the ./DELETERIOUS/ directory ({3} '
+          'unique events, {4} total events).'.format(nondel_count,
+                nondel_total_count, del_count, del_total_count))
     return None
 
 if __name__ == '__main__':
