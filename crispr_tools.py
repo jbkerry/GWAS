@@ -30,13 +30,15 @@ silents = {'1A': ('7578495-C-G', '7578498-C-T', '7578501-C-G', '7578504-A-T',
                     '31022643-G-T', '31022657-C-A', '31022660-A-G'),
            'A-mut': ('31022633-T-C', '31022636-C-T', '31022642-C-T',
                      '31022657-C-A', '31022660-A-G')}
-vep_cmd = 'module load ensembl-api/20170130\nperl /package/ensembl/20170130/' \
-          'ensembl-tools/scripts/variant_effect_predictor/variant_effect_' \
-          'predictor.pl --database --assembly GRCh37 --port 3337 --polyphen b ' \
-          '--sift b --force_overwrite'
+vep_cmd = 'module load perl\nmodule load ensembl-api/20170130\nperl ' \
+          '/package/ensembl/20170130/ensembl-tools/scripts/variant_effect_' \
+          'predictor/variant_effect_predictor.pl --database --assembly ' \
+          'GRCh37 --port 3337 --polyphen b --sift b --force_overwrite'
+
+#stats_file = open('stats.txt', 'w')
 
 def collapse_vcfs(oligo, v_dir='.'):
-    vcf_list = [x for x in os.listdir(v_dir) if (x.endswith('.vcf')) & (x!='test.vcf')]
+    vcf_list = [x for x in os.listdir(v_dir) if (x.endswith('.vcf')) & (x!='temp.vcf')]
     vcf_dict = {}
     bar_dict = {}
     bar_collapse = [0, 0]
@@ -81,6 +83,12 @@ def collapse_vcfs(oligo, v_dir='.'):
           '{1} will now be run through VEP.'.format(
             vcf_collapse[1],
             vcf_collapse[0]))
+    stats_file.write('Type\tTotal\tUnique\n')
+    stats_file.write('BARCODE\t{}\t{}\n'.format(bar_collapse[1],
+                                                bar_collapse[0]))
+    stats_file.write('ALL MUTANTS\t{}\t{}\n'.format(vcf_collapse[1],
+                                                    vcf_collapse[0]))
+    
     return vcf_dict
 
 def run_vep(vcf_dict, oligo, v_dir='.', verbose=False, keep_vep=False):
@@ -193,7 +201,14 @@ def run_vep(vcf_dict, oligo, v_dir='.', verbose=False, keep_vep=False):
           'mutation and were stored in the ./DELETERIOUS/ directory ({2} '
           'unique events, {3} total events).'.format(nondel_count,
                 nondel_total_count, del_count, del_total_count))
+    stats_file.write('NON-DELETERIOUS\t{}\t{}\n'.format(nondel_total_count,
+                                                        nondel_count))
+    stats_file.write('DELETERIOUS\t{}\t{}\n'.format(del_total_count,
+                                                    del_count))
+    stats_file.close()
+    
     return None
+
 
 if __name__ == '__main__':
     
@@ -215,6 +230,13 @@ if __name__ == '__main__':
         required = True,
     )
     parser.add_argument(
+        '-n',
+        '--name',
+        type = str,
+        help = 'Name of run',
+        required = False,
+    )
+    parser.add_argument(
         '-v',
         '--verbose',
         action = 'store_true',
@@ -232,6 +254,13 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     
+
+    if args.name:
+        stats_file = open('{}_stats.txt'.format(args.name), 'w')
+        stats_file.write('{}\n'.format(args.name))
+    else:
+        stats_file = open('stats.txt', 'w')
+        
     vcf_dict = collapse_vcfs(str(args.oligo), v_dir=args.dir)
     run_vep(vcf_dict,
             str(args.oligo),
