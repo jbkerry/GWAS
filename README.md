@@ -1,2 +1,2 @@
-# GWAS
+# NGS
 `Add description`

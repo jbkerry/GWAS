@@ -38,7 +38,7 @@ vep_cmd = 'module load perl\nmodule load ensembl-api/20170130\nperl ' \
 #stats_file = open('stats.txt', 'w')
 
 def collapse_vcfs(oligo, v_dir='.'):
-    vcf_list = [x for x in os.listdir(v_dir) if (x.endswith('.vcf')) & (x!='temp.vcf')]
+    vcf_list = (x for x in os.listdir(v_dir) if (x.endswith('.vcf')) & (x!='temp.vcf'))
     vcf_dict = {}
     bar_dict = {}
     bar_collapse = [0, 0]
