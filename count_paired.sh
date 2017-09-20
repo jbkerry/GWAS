@@ -1,1 +1,0 @@
-/t1-home/nuffmed/jkerry/shortcuts/count_paired.sh
